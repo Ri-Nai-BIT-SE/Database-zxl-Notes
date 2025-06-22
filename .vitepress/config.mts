@@ -26,7 +26,8 @@ export default defineConfig({
           { text: '关系代数', link: '/chapters/5-ra' },
           { text: 'SQL', link: '/chapters/6-sql' },
           { text: '并发控制', link: '/chapters/7-concurrency' },
-          { text: 'XML', link: '/chapters/8-xml' }
+          { text: 'XML', link: '/chapters/8-xml' },
+          { text: 'OLAP', link: '/chapters/9-olap' }
         ]
       },
       {

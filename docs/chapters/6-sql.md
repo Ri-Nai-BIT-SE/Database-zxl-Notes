@@ -1,4 +1,6 @@
-# 数据库复习笔记
+# 数据库复习笔记（PL/SQL 版本）
+
+> **说明**: 本笔记已统一采用 Oracle PL/SQL 语法，包括数据类型、存储过程、函数、触发器等所有示例代码。
 
 ## 一、基础 SQL 查询（SELECT-FROM-WHERE）
 
@@ -473,19 +475,51 @@ ON o.customer_id = latest.customer_id AND o.order_date = latest.max_date;
 * **参数模式**:
     * **`IN`**: 输入参数。在调用时传入值，存储过程内部只能读取。
         ```sql
-        CREATE PROCEDURE GetCustomerName (IN customerId INT)
+        CREATE OR REPLACE PROCEDURE GetCustomerName (customerId IN NUMBER)
+        IS
+        BEGIN
+            -- 过程体
+            NULL;
+        END GetCustomerName;
+        /
         ```
     * **`OUT`**: 输出参数。存储过程内部可以修改其值，并在执行结束后将值返回给调用者。
         ```sql
-        CREATE PROCEDURE GetProductPrice (IN productId INT, OUT productPrice DECIMAL(10,2))
+        CREATE OR REPLACE PROCEDURE GetProductPrice (
+            productId IN NUMBER, 
+            productPrice OUT NUMBER
+        )
+        IS
+        BEGIN
+            SELECT price INTO productPrice 
+            FROM Products 
+            WHERE product_id = productId;
+        END GetProductPrice;
+        /
         ```
-    * **`INOUT`**: 输入输出参数。调用时传入值，存储过程内部可以读取和修改，并在执行结束后将修改后的值返回。
+    * **`IN OUT`**: 输入输出参数。调用时传入值，存储过程内部可以读取和修改，并在执行结束后将修改后的值返回。
         ```sql
-        CREATE PROCEDURE UpdateCounter (INOUT currentCount INT)
+        CREATE OR REPLACE PROCEDURE UpdateCounter (currentCount IN OUT NUMBER)
+        IS
+        BEGIN
+            currentCount := currentCount + 1;
+        END UpdateCounter;
+        /
         ```
 * **调用方式**:
     ```sql
-    CALL GetCustomerName(123);
+    -- 在PL/SQL块中调用
+    DECLARE
+        v_customer_id NUMBER := 123;
+        v_price NUMBER;
+        v_counter NUMBER := 10;
+    BEGIN
+        GetCustomerName(v_customer_id);
+        GetProductPrice(1, v_price);
+        UpdateCounter(v_counter);
+        DBMS_OUTPUT.PUT_LINE('Counter value: ' || v_counter);
+    END;
+    /
     ```
 
 ### 函数（Functions）
@@ -495,20 +529,39 @@ ON o.customer_id = latest.customer_id AND o.order_date = latest.max_date;
 * **类型**:
     * **标量函数**: 返回单个值（例如，一个数字、一个字符串）。
         ```sql
-        CREATE FUNCTION CalculateTotalPrice (quantity INT, unitPrice DECIMAL(10,2))
-        RETURNS DECIMAL(10,2)
+        CREATE OR REPLACE FUNCTION CalculateTotalPrice (
+            quantity IN NUMBER, 
+            unitPrice IN NUMBER
+        ) RETURN NUMBER
+        IS
         BEGIN
             RETURN quantity * unitPrice;
-        END;
+        END CalculateTotalPrice;
+        /
         ```
-    * **表值函数**: 返回一个表（结果集）。
+    * **表函数**: 返回一个表（结果集）。在PL/SQL中通常使用管道函数。
         ```sql
-        CREATE FUNCTION GetProductsByCategory (categoryId INT)
-        RETURNS TABLE (product_id INT, product_name VARCHAR(100))
-        AS
+        -- 首先定义对象类型
+        CREATE OR REPLACE TYPE product_obj AS OBJECT (
+            product_id NUMBER,
+            product_name VARCHAR2(100)
+        );
+        /
+        
+        CREATE OR REPLACE TYPE product_tab AS TABLE OF product_obj;
+        /
+        
+        -- 创建管道函数
+        CREATE OR REPLACE FUNCTION GetProductsByCategory (categoryId IN NUMBER)
+        RETURN product_tab PIPELINED
+        IS
         BEGIN
-            RETURN (SELECT id, name FROM Products WHERE category_id = categoryId);
-        END;
+            FOR rec IN (SELECT id, name FROM Products WHERE category_id = categoryId) LOOP
+                PIPE ROW(product_obj(rec.id, rec.name));
+            END LOOP;
+            RETURN;
+        END GetProductsByCategory;
+        /
         ```
 
 ### 控制流语句
@@ -519,38 +572,56 @@ ON o.customer_id = latest.customer_id AND o.order_date = latest.max_date;
     ```sql
     IF condition THEN
         -- statements for true condition
-    ELSEIF another_condition THEN -- (PL/SQL 中为 ELSIF)
+    ELSIF another_condition THEN -- PL/SQL 中使用 ELSIF
         -- statements for another_condition
     ELSE
         -- statements for false condition
     END IF;
     ```
 * **循环语句**: 重复执行代码块直到满足特定条件。
-    * **`LOOP ... END LOOP;`**: 基本循环，通常需要 `LEAVE` 或 `EXIT` 来退出。
+    * **`LOOP ... END LOOP;`**: 基本循环，使用 `EXIT` 来退出。
         ```sql
-        DECLARE i INT DEFAULT 0;
-        LOOP
-            SET i = i + 1;
-            IF i > 10 THEN
-                LEAVE;
-            END IF;
-            -- do something
-        END LOOP;
+        DECLARE
+            i NUMBER := 0;
+        BEGIN
+            LOOP
+                i := i + 1;
+                IF i > 10 THEN
+                    EXIT;
+                END IF;
+                -- do something
+                DBMS_OUTPUT.PUT_LINE('i = ' || i);
+            END LOOP;
+        END;
+        /
         ```
-    * **`WHILE ... DO ... END WHILE;`**: 当条件为真时重复执行。
+    * **`WHILE ... LOOP ... END LOOP;`**: 当条件为真时重复执行。
         ```sql
-        WHILE i < 10 DO
-            SET i = i + 1;
-            -- do something
-        END WHILE;
+        DECLARE
+            i NUMBER := 0;
+        BEGIN
+            WHILE i < 10 LOOP
+                i := i + 1;
+                -- do something
+                DBMS_OUTPUT.PUT_LINE('i = ' || i);
+            END LOOP;
+        END;
+        /
         ```
-    * **`REPEAT ... UNTIL ... END REPEAT;`**: 至少执行一次，直到条件为真。
+    * **`FOR ... LOOP ... END LOOP;`**: 计数循环，PL/SQL特有。
         ```sql
-        REPEAT
-            SET i = i + 1;
-            -- do something
-        UNTIL i >= 10
-        END REPEAT;
+        BEGIN
+            FOR i IN 1..10 LOOP
+                -- do something
+                DBMS_OUTPUT.PUT_LINE('i = ' || i);
+            END LOOP;
+            
+            -- 反向循环
+            FOR i IN REVERSE 1..10 LOOP
+                DBMS_OUTPUT.PUT_LINE('i = ' || i);
+            END LOOP;
+        END;
+        /
         ```
 
 
@@ -591,7 +662,7 @@ ON o.customer_id = latest.customer_id AND o.order_date = latest.max_date;
 
 #### 🧪 示例场景：给每个员工加薪 10%，并打印信息
 
-##### ✅ 使用数据库：SQL Server 或 MySQL（语法略有不同，这里以 **SQL Server / T-SQL** 为例）
+##### ✅ 使用数据库：Oracle（PL/SQL 版本）
 
 
 ##### 🔧 第一步：创建表并插入数据
@@ -599,55 +670,102 @@ ON o.customer_id = latest.customer_id AND o.order_date = latest.max_date;
 ```sql
 -- 创建员工表
 CREATE TABLE Employees (
-    EmployeeID INT PRIMARY KEY,
-    Name NVARCHAR(50),
-    Salary DECIMAL(10,2)
+    EmployeeID NUMBER PRIMARY KEY,
+    Name VARCHAR2(50),
+    Salary NUMBER(10,2)
 );
 
 -- 插入测试数据
-INSERT INTO Employees (EmployeeID, Name, Salary) VALUES
-(1, 'Alice', 5000),
-(2, 'Bob', 6000),
-(3, 'Charlie', 4500);
+INSERT INTO Employees (EmployeeID, Name, Salary) VALUES (1, 'Alice', 5000);
+INSERT INTO Employees (EmployeeID, Name, Salary) VALUES (2, 'Bob', 6000);
+INSERT INTO Employees (EmployeeID, Name, Salary) VALUES (3, 'Charlie', 4500);
 ```
 
 
-#### 🔁 第二步：声明和使用游标
+#### 🔁 第二步：使用 PL/SQL 游标处理
 
 ```sql
--- 声明变量用于保存当前行的数据
-DECLARE @EmployeeID INT;
-DECLARE @Name NVARCHAR(50);
-DECLARE @Salary DECIMAL(10,2);
+-- PL/SQL 块：声明和使用游标
+DECLARE
+    -- 声明变量用于保存当前行的数据
+    v_EmployeeID NUMBER;
+    v_Name VARCHAR2(50);
+    v_Salary NUMBER(10,2);
+    
+    -- 声明游标
+    CURSOR emp_cursor IS 
+        SELECT EmployeeID, Name, Salary 
+        FROM Employees;
 
--- 声明游标
-DECLARE emp_cursor CURSOR FOR 
-SELECT EmployeeID, Name, Salary FROM Employees;
-
--- 打开游标
-OPEN emp_cursor;
-
--- 获取第一行数据
-FETCH NEXT FROM emp_cursor INTO @EmployeeID, @Name, @Salary;
-
--- 循环遍历所有行
-WHILE @@FETCH_STATUS = 0
 BEGIN
-    -- 打印当前员工信息
-    PRINT 'Processing employee: ' + @Name + ', Current salary: ' + CAST(@Salary AS NVARCHAR(20));
+    -- 启用输出（类似于 SQL Server 的 PRINT）
+    DBMS_OUTPUT.ENABLE(1000000);
+    
+    -- 打开游标
+    OPEN emp_cursor;
+    
+    -- 循环遍历所有行
+    LOOP
+        -- 获取数据到变量中
+        FETCH emp_cursor INTO v_EmployeeID, v_Name, v_Salary;
+        
+        -- 检查是否还有数据（类似于 @@FETCH_STATUS）
+        EXIT WHEN emp_cursor%NOTFOUND;
+        
+        -- 打印当前员工信息
+        DBMS_OUTPUT.PUT_LINE('Processing employee: ' || v_Name || 
+                            ', Current salary: ' || TO_CHAR(v_Salary));
+        
+        -- 更新工资：增加10%
+        UPDATE Employees
+        SET Salary = Salary * 1.10
+        WHERE EmployeeID = v_EmployeeID;
+        
+    END LOOP;
+    
+    -- 关闭游标
+    CLOSE emp_cursor;
+    
+    DBMS_OUTPUT.PUT_LINE('Salary update completed!');
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        -- 异常处理
+        DBMS_OUTPUT.PUT_LINE('Error occurred: ' || SQLERRM);
+        ROLLBACK;
+END;
+/
+```
 
-    -- 更新工资：增加10%
-    UPDATE Employees
-    SET Salary = Salary * 1.10
-    WHERE EmployeeID = @EmployeeID;
+##### 🎯 **PL/SQL 的另一种写法：FOR 循环游标（更简洁）**
 
-    -- 获取下一行数据
-    FETCH NEXT FROM emp_cursor INTO @EmployeeID, @Name, @Salary;
-END
-
--- 关闭并释放游标
-CLOSE emp_cursor;
-DEALLOCATE emp_cursor;
+```sql
+-- 使用 FOR 循环的简化版本
+BEGIN
+    DBMS_OUTPUT.ENABLE(1000000);
+    
+    -- FOR 循环自动处理游标的打开、关闭和获取
+    FOR emp_rec IN (SELECT EmployeeID, Name, Salary FROM Employees)
+    LOOP
+        -- 打印当前员工信息
+        DBMS_OUTPUT.PUT_LINE('Processing employee: ' || emp_rec.Name || 
+                            ', Current salary: ' || TO_CHAR(emp_rec.Salary));
+        
+        -- 更新工资：增加10%
+        UPDATE Employees
+        SET Salary = Salary * 1.10
+        WHERE EmployeeID = emp_rec.EmployeeID;
+        
+    END LOOP;
+    
+    DBMS_OUTPUT.PUT_LINE('Salary update completed!');
+    
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error occurred: ' || SQLERRM);
+        ROLLBACK;
+END;
+/
 ```
 
 
@@ -666,16 +784,30 @@ SELECT * FROM Employees;
 | 3          | Charlie | 4950.00 |
 
 
-#### 📌 总结说明
+#### 📌 PL/SQL 语法特点
 
-| 步骤               | 作用说明                                         |
-| ------------------ | ------------------------------------------------ |
-| `DECLARE`          | 声明游标和变量，准备处理每一行数据               |
-| `OPEN`             | 打开游标，准备开始读取数据                       |
-| `FETCH`            | 从结果集中取出一行数据，赋值给变量               |
-| `WHILE` 循环       | 遍历每一行，对每条记录进行操作（如打印、更新等） |
-| `UPDATE`           | 在循环中更新员工的工资                           |
-| `CLOSE/DEALLOCATE` | 关闭并释放游标资源                               |
+| 功能               | PL/SQL 语法                          | 说明                                 |
+| ------------------ | ------------------------------------ | ------------------------------------ |
+| **变量声明**       | `v_var NUMBER` (在 DECLARE 块中)     | 变量名通常以 v_ 开头                 |
+| **游标声明**       | `CURSOR cur IS ...`                  | 游标声明在 DECLARE 块中              |
+| **字符串连接**     | `'str1' || 'str2'`                   | 使用双竖线连接字符串                 |
+| **输出语句**       | `DBMS_OUTPUT.PUT_LINE('message')`    | 需要先启用 DBMS_OUTPUT               |
+| **循环条件**       | `EXIT WHEN cursor%NOTFOUND`          | 使用游标属性判断状态                 |
+| **类型转换**       | `TO_CHAR(value)`, `TO_NUMBER(value)` | 丰富的类型转换函数                   |
+| **块结构**         | `DECLARE ... BEGIN ... END;`        | 完整的块结构，以 / 结束              |
+| **异常处理**       | `EXCEPTION WHEN ... THEN`            | 强大的异常处理机制                   |
+| **条件语句**       | `IF ... THEN ... ELSIF ... END IF;`  | 注意是 ELSIF 不是 ELSEIF             |
+| **循环语句**       | `LOOP ... END LOOP;`                 | 多种循环类型：LOOP、WHILE、FOR       |
+
+#### 🎯 PL/SQL 特有优势
+
+| 特性                   | 说明                                   |
+| ---------------------- | -------------------------------------- |
+| **FOR 循环游标**       | 自动管理游标生命周期，代码更简洁       |
+| **隐式游标属性**       | `%FOUND`, `%NOTFOUND`, `%ROWCOUNT` 等  |
+| **强类型系统**         | `%TYPE`, `%ROWTYPE` 锚定类型           |
+| **嵌套表和集合**       | 支持复杂数据结构                       |
+| **包（Package）结构**  | 更好的代码组织和封装                   |
 
 
 #### 💡 小提示
@@ -741,29 +873,32 @@ SELECT * FROM Employees;
 * **主键（PRIMARY KEY）**: 唯一标识表中每一行的列或列的组合。主键值必须是唯一的且不能为 `NULL`。
     ```sql
     CREATE TABLE Students (
-        student_id INT PRIMARY KEY,
-        student_name VARCHAR(100)
+        student_id NUMBER PRIMARY KEY,
+        student_name VARCHAR2(100)
     );
     -- 复合主键
     CREATE TABLE Enrollments (
-        student_id INT,
-        course_id INT,
-        PRIMARY KEY (student_id, course_id)
+        student_id NUMBER,
+        course_id NUMBER,
+        enrollment_date DATE DEFAULT SYSDATE,
+        CONSTRAINT PK_Enrollments PRIMARY KEY (student_id, course_id)
     );
     ```
 * **唯一约束（UNIQUE）**: 保证指定列中的所有值都是唯一的。与主键不同，允许包含 `NULL` 值，但最多只能有一个 `NULL` 值。
     ```sql
     CREATE TABLE Employees (
-        employee_id INT PRIMARY KEY,
-        email VARCHAR(100) UNIQUE
+        employee_id NUMBER PRIMARY KEY,
+        email VARCHAR2(100),
+        CONSTRAINT UK_Employees_Email UNIQUE (email)
     );
     ```
 * **外键（FOREIGN KEY）**: 用于建立和加强两个表之间数据链接的列（或多列）。它引用另一个表的主键或唯一键。
     ```sql
     CREATE TABLE Orders (
-        order_id INT PRIMARY KEY,
-        customer_id INT,
-        FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+        order_id NUMBER PRIMARY KEY,
+        customer_id NUMBER,
+        order_date DATE DEFAULT SYSDATE,
+        CONSTRAINT FK_Orders_Customer FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
     );
     ```
     * **级联操作**: 当被引用的主键表中的数据发生变化时，外键表中的数据如何响应。
@@ -775,17 +910,17 @@ SELECT * FROM Employees;
     * **列级**:
         ```sql
         CREATE TABLE Products (
-            product_id INT PRIMARY KEY,
-            price DECIMAL(10,2) CHECK (price >= 0.00 AND price <= 5000.00)
+            product_id NUMBER PRIMARY KEY,
+            price NUMBER(10,2) CHECK (price >= 0.00 AND price <= 5000.00)
         );
         ```
     * **表级**:
         ```sql
         CREATE TABLE Sales (
-            sale_id INT PRIMARY KEY,
-            bar_name VARCHAR(100),
-            price DECIMAL(10,2),
-            CHECK (bar_name = 'Joe''s Bar' OR price <= 5.00)
+            sale_id NUMBER PRIMARY KEY,
+            bar_name VARCHAR2(100),
+            price NUMBER(10,2),
+            CONSTRAINT CHK_Sales_Business_Rule CHECK (bar_name = 'Joe''s Bar' OR price <= 5.00)
         );
         ```
 * **断言（ASSERTION）**: 对数据库状态的全局约束，不与任何特定表相关联。在实际数据库系统中，断言通常由触发器或存储过程来实现。
@@ -799,37 +934,222 @@ SELECT * FROM Employees;
 
 触发器是一种特殊的存储过程，它在数据库中发生特定事件（如 `INSERT`, `UPDATE`, `DELETE`）时自动执行。
 
+#### 触发器的作用与用途
+
+* **自动记录日志**: 记录数据变更的历史记录
+* **数据验证**: 在数据变更前进行复杂的业务规则验证
+* **审计跟踪**: 自动记录谁在什么时候做了什么操作
+* **自动更新相关字段**: 如最后修改时间、统计数据等
+* **级联操作**: 当一个表的数据变化时，自动更新相关表
+
+#### 触发器分类
+
 * **触发时机**:
     * **`BEFORE`**: 在触发事件发生**之前**执行。常用于数据验证或预处理。
     * **`AFTER`**: 在触发事件发生**之后**执行。常用于审计、数据同步或级联操作。
     * **`INSTEAD OF`**: 替代 `INSERT`, `UPDATE`, `DELETE` 操作在视图上执行。主要用于可更新视图。
-* **引用新旧数据**: 在触发器中，你可以引用受影响行的新旧值。
-    * **`NEW`**: 用于 `INSERT` 和 `UPDATE` 操作，代表新插入或更新后的行数据。
-    * **`OLD`**: 用于 `DELETE` 和 `UPDATE` 操作，代表删除前或更新前的行数据。
 
-* **示例（MySQL 语法）**:
+* **触发级别**:
+    * **行级触发器（`FOR EACH ROW`）**: 每行都触发一次，可以访问 `:NEW` 和 `:OLD`
+    * **语句级触发器**: 整个语句只触发一次，不使用 `FOR EACH ROW`
+
+#### 引用新旧数据
+
+在触发器中，你可以引用受影响行的新旧值：
+* **`:NEW`**: 用于 `INSERT` 和 `UPDATE` 操作，代表新插入或更新后的行数据
+* **`:OLD`**: 用于 `DELETE` 和 `UPDATE` 操作，代表删除前或更新前的行数据
+
+#### 触发器语法对比
+
+| 特性 | Oracle (PL/SQL) | 其他数据库对比 |
+|------|----------------|----------------|
+| **创建语法** | `CREATE [OR REPLACE] TRIGGER` | MySQL: `CREATE TRIGGER`<br>SQL Server: `CREATE TRIGGER` |
+| **新/旧数据** | `:NEW`, `:OLD` | MySQL: `NEW`, `OLD`<br>SQL Server: `INSERTED`, `DELETED` |
+| **抛出异常** | `RAISE_APPLICATION_ERROR` | MySQL: `SIGNAL SQLSTATE`<br>SQL Server: `RAISERROR` |
+| **分隔符** | `/` | MySQL: `DELIMITER $$`<br>SQL Server: 不需要 |
+
+#### 完整示例：Oracle 触发器
+
+假设有一个员工表结构：
+```sql
+CREATE TABLE Employees (
+    EmployeeID   NUMBER PRIMARY KEY,
+    Name         VARCHAR2(100),
+    Salary       NUMBER(10,2),
+    LastUpdated  DATE
+);
+```
+
+##### 示例 1：BEFORE UPDATE 触发器 - 自动更新时间戳
+
+```sql
+CREATE OR REPLACE TRIGGER trg_update_employee_lastupdated
+BEFORE UPDATE ON Employees
+FOR EACH ROW
+BEGIN
+    :NEW.LastUpdated := SYSDATE;
+END;
+/
+```
+
+##### 示例 2：AFTER INSERT 触发器 - 记录操作日志
+
+```sql
+-- 首先创建日志表
+CREATE TABLE Employee_Log (
+    LogID      NUMBER GENERATED BY DEFAULT AS IDENTITY,
+    Action     VARCHAR2(50),
+    EmployeeID NUMBER,
+    ActionTime DATE
+);
+
+-- 创建触发器
+CREATE OR REPLACE TRIGGER trg_after_insert_employee
+AFTER INSERT ON Employees
+FOR EACH ROW
+BEGIN
+    INSERT INTO Employee_Log (Action, EmployeeID, ActionTime)
+    VALUES ('Inserted', :NEW.EmployeeID, SYSDATE);
+END;
+/
+```
+
+##### 示例 3：BEFORE DELETE 触发器 - 防止删除特定记录
+
+```sql
+CREATE OR REPLACE TRIGGER trg_before_delete_employee
+BEFORE DELETE ON Employees
+FOR EACH ROW
+BEGIN
+    IF :OLD.EmployeeID = 1 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Cannot delete employee with ID 1.');
+    END IF;
+END;
+/
+```
+
+##### 示例 4：复杂业务逻辑 - 工资变动审计
+
+```sql
+CREATE OR REPLACE TRIGGER trg_salary_audit
+BEFORE UPDATE OF Salary ON Employees
+FOR EACH ROW
+DECLARE
+    salary_change_percent NUMBER;
+BEGIN
+    -- 计算工资变化百分比
+    salary_change_percent := ABS((:NEW.Salary - :OLD.Salary) / :OLD.Salary * 100);
+    
+    -- 如果工资变化超过20%，记录到审计表
+    IF salary_change_percent > 20 THEN
+        INSERT INTO Employee_Log (Action, EmployeeID, ActionTime)
+        VALUES ('Large Salary Change: ' || TO_CHAR(salary_change_percent, '999.99') || '%', 
+                :NEW.EmployeeID, SYSDATE);
+    END IF;
+    
+    -- 自动更新最后修改时间
+    :NEW.LastUpdated := SYSDATE;
+END;
+/
+```
+
+#### 更多 PL/SQL 触发器示例
+
+```sql
+-- AFTER INSERT 触发器示例：更新库存
+CREATE OR REPLACE TRIGGER trg_after_order_insert
+AFTER INSERT ON Orders
+FOR EACH ROW
+BEGIN
+    UPDATE Products 
+    SET stock = stock - :NEW.quantity 
+    WHERE product_id = :NEW.product_id;
+END;
+/
+
+-- BEFORE UPDATE 触发器示例：验证价格
+CREATE OR REPLACE TRIGGER trg_before_product_update
+BEFORE UPDATE ON Products
+FOR EACH ROW
+BEGIN
+    IF :NEW.price < 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Product price cannot be negative');
+    END IF;
+END;
+/
+
+-- BEFORE INSERT 触发器示例：自动生成主键和验证数据
+CREATE OR REPLACE TRIGGER trg_before_insert_product
+BEFORE INSERT ON Products
+FOR EACH ROW
+BEGIN
+    -- 如果没有提供产品ID，自动生成
+    IF :NEW.product_id IS NULL THEN
+        SELECT product_seq.NEXTVAL INTO :NEW.product_id FROM DUAL;
+    END IF;
+    
+    -- 验证产品名称不能为空
+    IF :NEW.product_name IS NULL OR LENGTH(TRIM(:NEW.product_name)) = 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Product name cannot be empty');
+    END IF;
+    
+    -- 设置创建时间
+    :NEW.created_date := SYSDATE;
+END;
+/
+
+-- AFTER DELETE 触发器示例：记录删除操作
+CREATE OR REPLACE TRIGGER trg_after_delete_product
+AFTER DELETE ON Products
+FOR EACH ROW
+BEGIN
+    INSERT INTO Product_Delete_Log (
+        deleted_product_id,
+        deleted_product_name,
+        deleted_by,
+        delete_time
+    ) VALUES (
+        :OLD.product_id,
+        :OLD.product_name,
+        USER,
+        SYSDATE
+    );
+END;
+/
+```
+
+#### 触发器使用注意事项
+
+* **性能影响**: 触发器是"隐式"执行的，会影响 DML 操作的性能
+* **调试困难**: 触发器自动执行，调试时要特别小心
+* **避免复杂逻辑**: 尽量避免在触发器中放置复杂的业务逻辑
+* **执行顺序**: 如果多个触发器作用于同一张表和同一事件，要注意执行顺序
+* **递归问题**: 避免触发器间的相互调用导致无限递归
+* **事务一致性**: 触发器与触发它的语句在同一个事务中执行
+
+#### 触发器管理
+
+* **查看触发器**:
     ```sql
-    -- AFTER INSERT 触发器示例：更新库存
-    DELIMITER $$
-    CREATE TRIGGER after_order_insert
-    AFTER INSERT ON Orders
-    FOR EACH ROW
-    BEGIN
-        UPDATE Products SET stock = stock - NEW.quantity WHERE product_id = NEW.product_id;
-    END$$
-    DELIMITER ;
-
-    -- BEFORE UPDATE 触发器示例：验证价格
-    DELIMITER $$
-    CREATE TRIGGER before_product_update
-    BEFORE UPDATE ON Products
-    FOR EACH ROW
-    BEGIN
-        IF NEW.price < 0 THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product price cannot be negative';
-        END IF;
-    END$$
-    DELIMITER ;
+    -- Oracle
+    SELECT trigger_name, table_name, triggering_event, status 
+    FROM user_triggers;
+    
+    -- MySQL
+    SHOW TRIGGERS;
+    ```
+* **禁用/启用触发器**:
+    ```sql
+    -- Oracle
+    ALTER TRIGGER trigger_name DISABLE;
+    ALTER TRIGGER trigger_name ENABLE;
+    
+    -- MySQL
+    -- MySQL 不支持禁用单个触发器，只能删除后重建
+    ```
+* **删除触发器**:
+    ```sql
+    DROP TRIGGER trigger_name;
     ```
 
 
@@ -850,21 +1170,19 @@ SELECT * FROM Employees;
 
 * **`COMMIT`**: 提交事务。将事务中所有操作永久保存到数据库。
     ```sql
-    START TRANSACTION; -- 或 BEGIN TRANSACTION;
+    -- PL/SQL 中事务自动开始，无需显式声明
     INSERT INTO Accounts VALUES (1, 'Alice', 1000);
     UPDATE Accounts SET balance = balance - 100 WHERE account_id = 2;
     COMMIT;
     ```
 * **`ROLLBACK`**: 回滚事务。撤销事务中所有未提交的操作，使数据库恢复到事务开始前的状态。
     ```sql
-    START TRANSACTION;
     INSERT INTO Accounts VALUES (3, 'Bob', 500);
     -- 发生错误
     ROLLBACK;
     ```
 * **`SAVEPOINT`**: 设置保存点。允许你将事务回滚到事务中的某个特定点，而不是完全回滚整个事务。
     ```sql
-    START TRANSACTION;
     INSERT INTO Log (message) VALUES ('Operation 1 started');
     SAVEPOINT a;
     INSERT INTO Log (message) VALUES ('Operation 2 started');
@@ -1058,27 +1376,31 @@ DDL 用于定义和管理数据库的结构，包括创建、修改和删除数�
 * **表定义（CREATE TABLE）**: 创建新表。
     ```sql
     CREATE TABLE Products (
-        product_id INT PRIMARY KEY,
-        product_name VARCHAR(255) NOT NULL,
-        category VARCHAR(100) DEFAULT 'Uncategorized',
-        price DECIMAL(10, 2),
-        stock_quantity INT CHECK (stock_quantity >= 0),
-        supplier_id INT,
-        FOREIGN KEY (supplier_id) REFERENCES Suppliers(supplier_id)
+        product_id NUMBER PRIMARY KEY,
+        product_name VARCHAR2(255) NOT NULL,
+        category VARCHAR2(100) DEFAULT 'Uncategorized',
+        price NUMBER(10, 2),
+        stock_quantity NUMBER CHECK (stock_quantity >= 0),
+        supplier_id NUMBER,
+        created_date DATE DEFAULT SYSDATE,
+        CONSTRAINT FK_Products_Supplier FOREIGN KEY (supplier_id) REFERENCES Suppliers(supplier_id)
     );
     ```
 * **修改表（ALTER TABLE）**: 修改现有表的结构。
     ```sql
     -- 添加列
-    ALTER TABLE Customers ADD COLUMN email VARCHAR(255);
+    ALTER TABLE Customers ADD email VARCHAR2(255);
     -- 删除列
     ALTER TABLE Employees DROP COLUMN old_salary;
-    -- 修改列定义 (语法因数据库而异)
-    ALTER TABLE Products ALTER COLUMN price SET DEFAULT 0.00; -- PostgreSQL
-    ALTER TABLE Products MODIFY COLUMN price DECIMAL(12, 2); -- MySQL
-    ALTER TABLE Products ALTER COLUMN price DECIMAL(12, 2); -- SQL Server (简化)
+    -- 修改列定义 (Oracle语法)
+    ALTER TABLE Products MODIFY price DEFAULT 0.00;
+    ALTER TABLE Products MODIFY price NUMBER(12, 2);
     -- 添加约束
-    ALTER TABLE Orders ADD CONSTRAINT FK_CustomerID FOREIGN KEY (customer_id) REFERENCES Customers(customer_id);
+    ALTER TABLE Orders ADD CONSTRAINT FK_Orders_Customer 
+        FOREIGN KEY (customer_id) REFERENCES Customers(customer_id);
+    -- 添加检查约束
+    ALTER TABLE Products ADD CONSTRAINT CHK_Products_Price 
+        CHECK (price >= 0);
     ```
 * **删除表（DROP TABLE）**: 删除表及其所有数据。
     ```sql
@@ -1092,21 +1414,46 @@ DDL 用于定义和管理数据库的结构，包括创建、修改和删除数�
 
 动态 SQL 允许你在运行时构建和执行 SQL 语句。这对于需要根据不同条件或用户输入生成不同查询的场景非常有用。
 
-* **示例**:
+* **PL/SQL 示例**:
     ```sql
-    -- SQL Server
-    DECLARE @TableName NVARCHAR(128) = 'Products';
-    DECLARE @SQL NVARCHAR(MAX);
-    SET @SQL = 'SELECT * FROM ' + QUOTENAME(@TableName) + ' WHERE price > 100;';
-    EXEC sp_executesql @SQL;
-
-    -- PostgreSQL / Oracle (PL/SQL)
-    -- EXECUTE IMMEDIATE 'SELECT * FROM ' || table_name_variable || ' WHERE price > 100;';
+    -- Oracle PL/SQL 动态SQL
+    DECLARE
+        table_name_var VARCHAR2(128) := 'Products';
+        sql_stmt VARCHAR2(4000);
+        price_threshold NUMBER := 100;
+    BEGIN
+        -- 构建动态SQL语句
+        sql_stmt := 'SELECT * FROM ' || table_name_var || ' WHERE price > :price_val';
+        
+        -- 使用游标执行动态SQL
+        FOR rec IN (EXECUTE IMMEDIATE sql_stmt USING price_threshold) LOOP
+            DBMS_OUTPUT.PUT_LINE('Product: ' || rec.product_name || ', Price: ' || rec.price);
+        END LOOP;
+    END;
+    /
+    
+    -- 或者使用 EXECUTE IMMEDIATE 直接执行
+    DECLARE
+        table_name_var VARCHAR2(128) := 'Products';
+        sql_stmt VARCHAR2(4000);
+    BEGIN
+        sql_stmt := 'UPDATE ' || table_name_var || ' SET price = price * 1.1 WHERE price > 100';
+        EXECUTE IMMEDIATE sql_stmt;
+        COMMIT;
+    END;
+    /
     ```
-    * **`EXEC SQL PREPARE` 和 `EXEC SQL EXECUTE`**: 嵌入式 SQL 中的语法，用于预编译和执行动态语句。
+    * **预编译动态语句**: PL/SQL 中使用 `EXECUTE IMMEDIATE` 和绑定变量。
         ```sql
-        EXEC SQL PREPARE q FROM :query_text; -- :query_text 是一个宿主变量
-        EXEC SQL EXECUTE q;
+        DECLARE
+            query_text VARCHAR2(4000) := 'SELECT COUNT(*) FROM employees WHERE salary > :sal';
+            emp_count NUMBER;
+            min_salary NUMBER := 50000;
+        BEGIN
+            EXECUTE IMMEDIATE query_text INTO emp_count USING min_salary;
+            DBMS_OUTPUT.PUT_LINE('员工数量: ' || emp_count);
+        END;
+        /
         ```
 
 ### 聚合函数与分组（Grouping/Aggregation）
