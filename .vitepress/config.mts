@@ -34,8 +34,6 @@ export default defineConfig({
         text: '往年试题',
         items: [
           { text: '2022年网传往年题', link: '/paper/2022' },
-          { text: '2022年网传往年题中文版', link: '/paper/2022-zh' },
-          { text: '2022年网传往年题解析', link: '/paper/2022-analysis' }
         ]
       }
     ],
