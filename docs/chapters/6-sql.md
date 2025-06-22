@@ -404,7 +404,7 @@ WHERE o1.order_date = (
 );
 ```
 
-> ✅ 这里子查询依赖于外层查询的 `o1.customer_id`，所以叫“相关子查询”。
+> ✅ 这里子查询依赖于外层查询的 `o1.customer_id`，所以叫"相关子查询"。
 
 
 ##### 使用 JOIN（GROUP BY）：
@@ -950,7 +950,7 @@ SELECT * FROM Employees;
     * **`INSTEAD OF`**: 替代 `INSERT`, `UPDATE`, `DELETE` 操作在视图上执行。主要用于可更新视图。
 
 * **触发级别**:
-    * **行级触发器（`FOR EACH ROW`）**: 每行都触发一次，可以访问 `:NEW` 和 `:OLD`
+    * **`FOR EACH ROW`**: 每行都触发一次，可以访问 `:NEW` 和 `:OLD`
     * **语句级触发器**: 整个语句只触发一次，不使用 `FOR EACH ROW`
 
 #### 引用新旧数据
@@ -1198,7 +1198,7 @@ END;
 * **`SERIALIZABLE` (可串行化)**: 最高隔离级别。确保事务完全隔离，避免所有并发问题（脏读、不可重复读、幻读）。通过加锁来实现，并发性能最低。
 * **`REPEATABLE READ` (可重复读)**: 保证一个事务在多次读取同一数据时，结果始终一致。可以避免脏读和不可重复读，但可能出现幻读。
 * **`READ COMMITTED` (读已提交)**: 只能读取已经提交的数据。可以避免脏读，但可能出现不可重复读和幻读。这是许多数据库的默认隔离级别。
-* **`READ UNCOMMITTED` (读未提交)**: 最低隔离级别。允许读取其他事务尚未提交的数据，这可能导致“脏读”（Dirty Read），即读取到已被回滚的数据。
+* **`READ UNCOMMITTED` (读未提交)**: 最低隔离级别。允许读取其他事务尚未提交的数据，这可能导致"脏读"（Dirty Read），即读取到已被回滚的数据。
 
 
 ## 八、视图与索引（Views & Indexes）
@@ -1281,7 +1281,7 @@ END;
 | 复合索引（Composite） | 多列组成的索引 | 查询条件涉及多个列时使用 |
 
 > 💡 **复合索引使用注意**：
-> - 符合“最左前缀原则”，即查询必须包含复合索引的最左边列才能命中索引。
+> - 符合"最左前缀原则"，即查询必须包含复合索引的最左边列才能命中索引。
 > - 例如：`idx_order(customer_id, order_date)` 可被以下查询命中：
 >   ```sql
 >   WHERE customer_id = 100
@@ -1487,3 +1487,239 @@ DDL 用于定义和管理数据库的结构，包括创建、修改和删除数�
     GROUP BY bar
     HAVING COUNT(beer) >= 3; -- 只显示销售了至少3种啤酒的酒吧
     ```
+
+## 十一、PL/SQL 语法速查表
+
+### 🔧 基本语法结构
+
+| 元素 | PL/SQL 语法 | 示例 |
+|------|-------------|------|
+| **块结构** | `DECLARE ... BEGIN ... EXCEPTION ... END;` | 完整的程序块结构 |
+| **变量声明** | `变量名 数据类型 := 初值;` | `v_count NUMBER := 0;` |
+| **常量声明** | `常量名 CONSTANT 数据类型 := 值;` | `c_rate CONSTANT NUMBER := 0.1;` |
+| **赋值语句** | `变量名 := 值;` | `v_salary := v_salary * 1.1;` |
+| **输出语句** | `DBMS_OUTPUT.PUT_LINE('内容');` | 需要先启用输出 |
+
+### 📊 数据类型对照
+
+| 通用类型 | PL/SQL 类型 | 说明 |
+|----------|-------------|------|
+| **整数** | `NUMBER`, `INTEGER`, `PLS_INTEGER` | `NUMBER` 最常用 |
+| **小数** | `NUMBER(p,s)` | `NUMBER(10,2)` 表示10位数，2位小数 |
+| **字符串** | `VARCHAR2(n)`, `CHAR(n)` | `VARCHAR2` 可变长度，`CHAR` 固定长度 |
+| **日期** | `DATE`, `TIMESTAMP` | `DATE` 包含日期和时间 |
+| **布尔** | `BOOLEAN` | 只能在PL/SQL中使用，不能存储在表中 |
+
+### 🔄 控制结构
+
+#### 条件语句
+```sql
+-- IF 语句
+IF condition THEN
+    statements;
+ELSIF another_condition THEN
+    statements;
+ELSE
+    statements;
+END IF;
+
+-- CASE 语句
+CASE variable
+    WHEN value1 THEN statements;
+    WHEN value2 THEN statements;
+    ELSE statements;
+END CASE;
+```
+
+#### 循环语句
+```sql
+-- 基本循环
+LOOP
+    statements;
+    EXIT WHEN condition;
+END LOOP;
+
+-- WHILE 循环
+WHILE condition LOOP
+    statements;
+END LOOP;
+
+-- FOR 循环
+FOR i IN 1..10 LOOP
+    statements;
+END LOOP;
+
+-- 游标 FOR 循环
+FOR rec IN (SELECT * FROM table_name) LOOP
+    statements;
+END LOOP;
+```
+
+### 🎯 游标操作
+
+```sql
+-- 显式游标
+DECLARE
+    CURSOR cursor_name IS SELECT * FROM table_name;
+    rec cursor_name%ROWTYPE;
+BEGIN
+    OPEN cursor_name;
+    LOOP
+        FETCH cursor_name INTO rec;
+        EXIT WHEN cursor_name%NOTFOUND;
+        -- 处理数据
+    END LOOP;
+    CLOSE cursor_name;
+END;
+/
+
+-- 游标属性
+cursor_name%FOUND      -- 是否找到数据
+cursor_name%NOTFOUND   -- 是否未找到数据
+cursor_name%ROWCOUNT   -- 处理的行数
+cursor_name%ISOPEN     -- 游标是否打开
+```
+
+### 🛠️ 存储过程和函数
+
+```sql
+-- 存储过程
+CREATE OR REPLACE PROCEDURE procedure_name (
+    param1 IN datatype,
+    param2 OUT datatype,
+    param3 IN OUT datatype
+)
+IS
+    -- 局部变量声明
+BEGIN
+    -- 过程体
+EXCEPTION
+    -- 异常处理
+END procedure_name;
+/
+
+-- 函数
+CREATE OR REPLACE FUNCTION function_name (
+    param1 IN datatype
+) RETURN return_datatype
+IS
+    -- 局部变量声明
+BEGIN
+    -- 函数体
+    RETURN value;
+EXCEPTION
+    -- 异常处理
+END function_name;
+/
+```
+
+### ⚡ 触发器
+
+```sql
+CREATE OR REPLACE TRIGGER trigger_name
+    {BEFORE | AFTER | INSTEAD OF} {INSERT | UPDATE | DELETE}
+    ON table_name
+    [FOR EACH ROW]
+BEGIN
+    -- 触发器体
+    -- 可以使用 :NEW 和 :OLD 引用新旧数据
+END trigger_name;
+/
+```
+
+### 🚨 异常处理
+
+```sql
+DECLARE
+    -- 声明部分
+BEGIN
+    -- 执行部分
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        -- 处理未找到数据异常
+    WHEN TOO_MANY_ROWS THEN
+        -- 处理返回多行异常
+    WHEN OTHERS THEN
+        -- 处理其他所有异常
+        DBMS_OUTPUT.PUT_LINE('错误: ' || SQLERRM);
+END;
+/
+
+-- 自定义异常
+DECLARE
+    custom_exception EXCEPTION;
+BEGIN
+    IF condition THEN
+        RAISE custom_exception;
+    END IF;
+EXCEPTION
+    WHEN custom_exception THEN
+        DBMS_OUTPUT.PUT_LINE('自定义异常发生');
+END;
+/
+```
+
+### 🔗 动态SQL
+
+```sql
+DECLARE
+    sql_stmt VARCHAR2(4000);
+    result_count NUMBER;
+BEGIN
+    -- 构建动态SQL
+    sql_stmt := 'SELECT COUNT(*) FROM ' || table_name || ' WHERE condition = :1';
+    
+    -- 执行动态SQL
+    EXECUTE IMMEDIATE sql_stmt INTO result_count USING bind_value;
+    
+    -- 或者用于DML
+    EXECUTE IMMEDIATE 'UPDATE table_name SET col1 = :1 WHERE col2 = :2' 
+        USING new_value, condition_value;
+END;
+/
+```
+
+### 📝 常用内置函数
+
+| 函数类型 | 函数名 | 说明 |
+|----------|--------|------|
+| **字符串** | `LENGTH(str)` | 字符串长度 |
+| | `SUBSTR(str, start, length)` | 截取子字符串 |
+| | `UPPER(str)`, `LOWER(str)` | 大小写转换 |
+| | `TRIM(str)` | 去除首尾空格 |
+| **数值** | `ROUND(num, digits)` | 四舍五入 |
+| | `TRUNC(num, digits)` | 截断 |
+| | `ABS(num)` | 绝对值 |
+| **日期** | `SYSDATE` | 当前系统日期时间 |
+| | `ADD_MONTHS(date, months)` | 日期加月份 |
+| | `MONTHS_BETWEEN(date1, date2)` | 两日期间月份差 |
+| **转换** | `TO_CHAR(value, format)` | 转换为字符串 |
+| | `TO_NUMBER(str)` | 转换为数值 |
+| | `TO_DATE(str, format)` | 转换为日期 |
+
+### 💡 最佳实践
+
+1. **命名规范**:
+   - 变量: `v_variable_name`
+   - 常量: `c_constant_name`
+   - 游标: `cur_cursor_name`
+   - 异常: `e_exception_name`
+
+2. **性能优化**:
+   - 使用绑定变量避免硬解析
+   - 批量操作使用 `FORALL` 和 `BULK COLLECT`
+   - 合理使用索引和执行计划
+
+3. **错误处理**:
+   - 总是包含异常处理部分
+   - 记录错误信息便于调试
+   - 使用具体的异常类型而非 `WHEN OTHERS`
+
+4. **代码结构**:
+   - 保持代码简洁易读
+   - 适当添加注释说明
+   - 模块化设计，功能单一
+
+---
+
+> **注意**: 本文档中的所有示例都基于 Oracle PL/SQL 语法。在实际使用时，请根据具体的 Oracle 版本调整语法细节。
